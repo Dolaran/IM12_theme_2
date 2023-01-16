@@ -215,3 +215,224 @@ create index django_session_expire_date_a5c62663 on django_session (expire_date)
 
 - RESTfull сервіс для управління даними
 
+## Кореневий файл серверу
+```js
+const http = require('http');
+const app = require('./index.js');
+
+const port = 4000;
+
+const server = http.createServer(app);
+
+server.listen(port);
+```
+## Файл управління сервером
+```js
+const express = require('express')
+const dataFileRoutes = require('./routes/dataFileRoutes.js');
+
+const app = express();
+
+app.use(express.json());
+app.use('/Categories', dataFileRoutes);
+
+module.exports = app;
+```
+## Файл для підключення до бази даних
+```js
+const mysql = require('mysql');
+
+const db = mysql.createConnection({
+    port: 3306,
+    host: 'localhost',
+    user: 'root',
+    password: 'gyv22010427',
+    database: 'pdappCategoryDatabase'
+});
+
+db.connect((err) => {
+    if (!err){
+        console.log('Connected to the database');
+    } else {
+        console.log(err);
+    }
+});
+
+module.exports = db;
+```
+## Кореневий файл контроллера
+```js
+const express = require('express');
+const { createDataFile, getDataFiles, getDataFile, deleteDataFile, updateDataFile } = require( '../controllers/dataFilesController.js');
+
+const router = express.Router();
+
+router.get('/', getDataFiles);
+
+router.post('/', createDataFile);
+
+router.get('/:id', getDataFile);
+
+router.delete('/:id', deleteDataFile);     
+
+router.patch('/:id', updateDataFile);
+
+module.exports = router;
+```
+## Файл контроллеру для управління запитами
+```js
+const db = require('../db_config/db_config.js');
+
+const createDataFile = (req, res) => {   
+    const { name, hex_code} = req.body;
+    const query = 'INSERT INTO users (name, hex_code) VALUES (?, ?)';
+
+    // Check for nesesery fields
+
+    if (!(name && hex_code)) {
+        const message = 'name, hex_code';
+        console.log(message);
+        return res
+            .status(404)
+            .json({message});
+    }
+
+    // Check for dublicated names
+
+    db.query('SELECT COUNT(*) AS namesCount FROM users WHERE name=?', [name], (err, result) => {
+        const count = result[0].namesCount;
+        if(count !== 0) {
+            const message = `Data file with name:[${name}] is already existing`;
+            console.log(message);
+            return res
+                .status(404)
+                .json({message});
+        }
+
+        // Create data file
+        db.query(query, [name, hex_code], (err, result) => {
+            if(!err){
+                const message = `Data file with name:[${name}] was added`;
+                console.log(message);
+                return res
+                    .status(200)
+                    .json({message});
+            } else {
+                return res
+                    .status(500)
+                    .json(err);
+            }
+        });
+    });
+
+};
+
+const getDataFiles = (req, res) => {
+
+    // Get data files
+
+    const query = 'SELECT *FROM users';
+    db.query(query, (err,result) => {
+        if(!err){
+            const message = 'Data files were succsesfuly received';
+            console.log(message);
+            return res
+                .status(200)
+                .json({message, result});
+        } else {
+            return res
+                .status(500)
+                .json(err);
+        }
+    });
+};
+
+const getDataFile = (req, res) => {
+    const id = req.params.id;
+    const query = 'SELECT *FROM users WHERE id=?';
+
+    // Get data file
+
+    db.query(query, [id], (err,result) => {
+        // Check if data file exist
+        if (result.length == 0) {
+            const message = `No data file with id:[${id}]`;
+            console.log(message);
+            return res
+                .status(404)
+                .json({message});
+        }
+        if(!err){
+            const message = `Data file with id:[${id}] was recieved`;
+            console.log(message);
+            return res
+                .status(200)
+                .json({message, result});
+        } else {
+            return res
+                .status(500)
+                .json(err);
+        }
+    });
+};
+
+const deleteDataFile = (req, res) => { 
+    const id = req.params.id;
+    const query = 'DELETE FROM users WHERE id=?';
+
+    // Deleate data file
+
+    db.query(query, [id], (err, result) => {
+        // Check if data file exist
+        if(result.affectedRows == 0) {
+            const message = `No data file with id:[${id}]`;
+            console.log(message);
+            return res
+                .status(404)
+                .json({message});
+        }
+        if(!err){
+            const message = `Data file with id:[${id}] was succsessfuly deleted`;
+            console.log(message);
+            return res
+                .status(200)
+                .json({message});
+        } else {
+            return res
+                .status(500)
+                .json(err);
+        }
+    });
+};
+
+const updateDataFile = (req,res) => {
+    const id = req.params.id; 
+    const { name, hex_code } = req.body;
+    const query = 'UPDATE users SET name=?, hex_code=? where id=?';
+
+    // Update data file
+
+    db.query(query, [name, hex_code, id],(err, result) => {
+        // Check if data file exist
+        if(result.affectedRows == 0) {
+            const message = `No data file with id:[${id}]`;
+            return res
+                .status(404)
+                .json({message});
+        }
+        if (!err) {
+            const message = `Data file with id:[${id}] succsessfuly updated`;
+            console.log(message);
+            return res
+                .status(200)
+                .json({message});
+        } else {
+            return res
+                .status(500)
+                .json(err);
+        }
+    });
+};
+
+module.exports = {createDataFile, getDataFiles, getDataFile, deleteDataFile, updateDataFile};
+```
